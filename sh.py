@@ -713,6 +713,9 @@ class RunningCommand(object):
         self._waited_until_completion = False
         should_wait = True
         spawn_process = True
+        close_stdin = False
+        close_stdout = False
+        close_stderr = False
 
         # this is used to track if we've already raised StopIteration, and if we
         # have, raise it immediately again if the user tries to call next() on
@@ -736,6 +739,15 @@ class RunningCommand(object):
         # redirection
         if call_args["err_to_out"]:
             stderr = OProc.STDOUT
+
+        if call_args["close_stdin"]:
+            close_stdin = True
+
+        if call_args["close_stdout"]:
+            close_stdout = True
+
+        if call_args["close_stderr"]:
+            close_stderr = True
 
         done_callback = call_args["done"]
         if done_callback:
@@ -774,7 +786,8 @@ class RunningCommand(object):
             process_assign_lock = threading.Lock()
             with process_assign_lock:
                 self.process = OProc(self, self.log, cmd, stdin, stdout, stderr,
-                                     self.call_args, pipe, process_assign_lock)
+                                     self.call_args, pipe, process_assign_lock,
+                                     close_stdin, close_stdout, close_stderr)
 
             logger_str = log_str_factory(self.ran, call_args, self.process.pid)
             self.log.context = self.log.sanitize_context(logger_str)
@@ -1270,6 +1283,15 @@ class Command(object):
         # whether or not to close all inherited fds. typically, this should be True, as inheriting fds can be a security
         # vulnerability
         "close_fds": True,
+
+        # whether or not to close stdin independent of any other setting
+        "close_stdin": False,
+
+        # whether or not to close stdout independent of any other setting
+        "close_stdout": False,
+
+        # whether or not to close stderr independent of any other setting
+        "close_stderr": False,
 
         # a whitelist of the integer fds to pass through to the child process. setting this forces close_fds to be True
         "pass_fds": set(),
@@ -1783,7 +1805,18 @@ class OProc(object):
     STDOUT = -1
     STDERR = -2
 
-    def __init__(self, command, parent_log, cmd, stdin, stdout, stderr, call_args, pipe, process_assign_lock):
+    def __init__(self,
+                 command,
+                 parent_log,
+                 cmd, stdin,
+                 stdout,
+                 stderr,
+                 call_args,
+                 pipe,
+                 process_assign_lock,
+                 close_stdin,
+                 close_stdout,
+                 close_stderr):
         """
             cmd is the full list of arguments that will be exec'd.  it includes the program name and all its arguments.
 
@@ -2068,6 +2101,24 @@ class OProc(object):
                             os.close(fd)
                         except OSError:
                             pass
+
+                if close_stdin:
+                    try:
+                        os.close(0)
+                    except OSError:
+                        pass
+
+                if close_stdout:
+                    try:
+                        os.close(1)
+                    except OSError:
+                        pass
+
+                if close_stderr:
+                    try:
+                        os.close(2)
+                    except OSError:
+                        pass
 
                 # actually execute the process
                 if ca["env"] is None:
