@@ -1,11 +1,15 @@
 from __future__ import print_function
-import os
-from os.path import dirname, abspath, join
-import sys
-import sh
+
 import codecs
+import os
+import sys
+from os.path import abspath
+from os.path import dirname
+from os.path import join
+
 from setuptools import setup
 
+import sh
 
 HERE = dirname(abspath(__file__))
 
@@ -17,6 +21,7 @@ keywords = ["subprocess", "process", "shell", "launch", "program"]
 def read(*parts):
     with codecs.open(join(HERE, *parts), "rb", "utf-8") as f:
         return f.read()
+
 
 setup(
     name="sh",
